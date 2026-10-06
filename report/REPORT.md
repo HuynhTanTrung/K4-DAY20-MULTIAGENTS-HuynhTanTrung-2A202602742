@@ -4,9 +4,9 @@
 
 ## 1. Thông tin nhóm và cấu hình
 
-| Họ tên | Mã sinh viên | Phần đóng góp |
-| ------ | ------------ | ------------- |
-|        |              |               |
+| Họ tên          | Mã sinh viên | Phần đóng góp |
+| --------------- | ------------ | ------------- |
+| Huỳnh Tấn Trung | 2A202602742  |               |
 
 - Nhà cung cấp và mô hình (`LAB_MODEL`, không ghi khóa API), nhiệt độ (`LAB_TEMPERATURE`), `recursion_limit`:
 - Phiên bản Deep Agents (`pip show deepagents`), hệ điều hành, chạy trực tiếp hay trong Docker:
@@ -77,7 +77,28 @@ Nhận xét: Nhóm E chiếm đa số (9/17 lỗi) — tác tử bỏ qua quy ư
 > Dán nội dung `report/table.md` và kết quả `python scripts/check_breakdown.py`. Nêu các lần chạy có `error` hoặc `skills_modified = true` (nếu có) và cách xử lý.
 
 ```text
-(dán bảng ở đây)
+| Task                              | baseline | subagents | skills-auto |
+| --------------------------------- | -------- | --------- | ----------- |
+| code-learn                        | 2/10     | 5/10      | 0/10        |
+| data-learn                        | 4/8      | 4/8       | 0/8         |
+| logs-learn                        | 6/9      | 6/9       | 6/9         |
+| code-eval                         | 0/11     | 0/11      | 0/11        |
+| data-eval                         | 0/9      | 0/9       | 0/9         |
+| logs-eval                         | 0/10     | 0/10      | 0/10        |
+| **Mean score - learning tasks**   | 0.46     | 0.56      | 0.22        |
+| **Mean score - evaluation tasks** | 0.00     | 0.00      | 0.00        |
+| **Mean tokens per run**           | 373,346  | 2,704,127 | 205,281     |
+| **Runs that read a skill**        | 0/6      | 0/6       | 0/6         |
+
+
+
+condition     role    technical  house rules  mean tokens  read a skill
+baseline      eval      0/18         0/12         187,032      0/3
+baseline      learn    12/18         0/9          559,660      0/3
+subagents     eval      0/18         0/12       4,484,190      0/3
+subagents     learn    15/18         0/9          924,064      0/3
+skills-auto   eval      0/18         0/12         207,589      0/3
+skills-auto   learn     6/18         0/9          202,973      0/3
 ```
 
 ## 8. Phân tích
@@ -85,26 +106,50 @@ Nhận xét: Nhóm E chiếm đa số (9/17 lỗi) — tác tử bỏ qua quy ư
 > Trả lời từng câu bằng số liệu từ mục 7 và bằng chứng từ vết. Kết quả âm hoặc không có khác biệt vẫn hợp lệ nếu được phân tích tốt.
 
 1. So với `baseline`, điều kiện nào cải thiện điểm tác vụ **học**? Điều kiện nào cải thiện điểm tác vụ **đánh giá**? Có điều kiện nào cải thiện tác vụ học nhưng không cải thiện tác vụ đánh giá? Nếu có, đó là dấu hiệu gì?
+   subagents cải thiện điểm tác vụ học (0.46 → 0.56), nhờ code-learn tăng từ 2/10 lên 5/10. skills-auto giảm điểm học (0.46 → 0.22) — code-learn và data-learn đều về 0/… Không điều kiện nào cải thiện điểm tác vụ đánh giá (đều 0.00). Không có điều kiện nào "cải thiện học nhưng không cải thiện đánh giá" — ngược lại, skills-auto giảm cả hai, dấu hiệu skill không được dùng nhưng SKILLS_NOTE vẫn gây ảnh hưởng tiêu cực lên prompt
+
 2. Tách điểm thành check kỹ thuật và check quy ước (`rule_`). Skill do curator sinh giúp nhóm check nào? Check quy ước **mới** của tác vụ đánh giá có được skill giúp không, và vì sao?
+   Check kỹ thuật: subagents 15/18 > baseline 12/18 > skills-auto 6/18. Check quy ước (rule\_\*): 0/9 ở mọi điều kiện — skill không giúp check quy ước mới nào, vì skills_read = 0 trên tất cả các lần chạy. Đây là bằng chứng phủ định cho H2
+
 3. Dựa vào vết và `skills_read`, giải thích một check mà skill giúp đạt và một check mà skill không giúp (skill chưa được đọc, đọc nhưng không làm theo, skill thiếu hoặc sai).
+   logs-learn đạt 6/9 ở cả ba điều kiện — tác tử xử lý được format log phức tạp bất kể skill, nhờ BASE_PROMPT đã đủ. data-learn đạt 4/8 ở baseline và subagents nhưng 0/8 ở skills-auto — nghi ngờ skill thorough-data-cleaning-and-validation chứa hướng dẫn gây hại ("giữ lại dòng đầu tiên"), nhưng vì skills_read = 0, cần xem trace.md để xác định nguyên nhân thực tế
+
 4. Chi phí: so sánh số token trung bình giữa các điều kiện. Điều kiện nào có hiệu quả tốt nhất theo điểm trên mỗi token? Đa tác tử có đáng chi phí trong thí nghiệm này không?
+   subagents tốn trung bình 2.704.127 token/lần — 7.2× baseline (373.346). skills-auto rẻ nhất (205.281). Theo điểm trên mỗi token: baseline hiệu quả nhất trên tác vụ học; subagents đắt gấp 7× nhưng chỉ tăng +0.10 điểm học — không đáng chi phí trong thí nghiệm này. Đa tác tử không hiệu quả về chi phí
+
 5. Có dấu hiệu rò rỉ dữ liệu hoặc quá khớp nào trong skill sinh ra không? Nhóm đã phòng tránh như thế nào?
+   Không có rò rỉ (skill không nhắc eval markers; validate_skill đã chặn). Không có bằng chứng quá khớp vì skills_read = 0 — tác tử không đọc skill nên không thể áp dụng. Ngược lại, skills-auto giảm điểm học, nghi ngờ SKILLS_NOTE thêm vào prompt gây phân tâm mà không có skill nào được đọc
+
 6. Nhiễu: so sánh điểm tác vụ học của cùng bộ skill ở Phần 3.4 (đã sao lưu) và sau đóng băng. Chênh lệch bao nhiêu? Nó cho biết điều gì về độ tin cậy của các chênh lệch trong bảng ở mục 7?
+   Không có số liệu so sánh cùng bộ skill trước/sau đóng băng (mỗi cấu hình chỉ chạy một lần). Chênh lệch giữa các điều kiện (0.46 vs 0.56 vs 0.22) có thể nằm trong nhiễu mô hình — cần ít nhất 2–3 lần chạy mỗi cấu hình để kết luận chắc chắn
 
 ## 9. Hạn chế và tính hợp lệ
 
 > Nêu ít nhất 3 hạn chế và ảnh hưởng của từng hạn chế đến kết luận (ví dụ: chỉ 3 tác vụ mỗi vai trò, mỗi cấu hình chạy một lần, nhiễu của mô hình, tác vụ do giảng viên thiết kế sẵn quy ước, chỉ một mô hình).
 
-1.
-2.
-3.
+1. Mỗi cấu hình chỉ chạy một lần — không đủ để tách tín hiệu khỏi nhiễu mô hình. Chênh lệch 0.46 vs 0.56 có thể không có ý nghĩa thống kê
+2. Chỉ 3 tác vụ mỗi vai trò — mẫu nhỏ, một tác vụ thay đổi lớn (như code-learn 2/10 → 5/10) chi phối toàn bộ trung bình
+3. skills_read = 0 trên mọi điều kiện — không thể kết luận về tác động của skill lên hành vi tác tử; kết quả skills-auto giảm điểm có thể do SKILLS_NOTE thêm vào prompt mà không có skill nào được đọc
+4. Chỉ một mô hình (gemini-3.5-flash-lite) — kết quả không khái quát cho mô hình mạnh hơn
+5. Hai test test_02_agent.py fail trên Windows do lệnh Unix (which, cat, ls); môi trường khác có thể cho kết quả khác
 
 ## 10. Kết luận
 
 > Tối đa 5 câu. Chỉ khẳng định điều số liệu hỗ trợ. Nêu một đề xuất cải tiến tiếp theo.
+> subagents cải thiện nhẹ điểm tác vụ học (0.46 → 0.56) nhưng tốn 7.2× token — không đáng chi phí. skills-auto giảm điểm học (0.46 → 0.22) và không cải thiện điểm đánh giá; skills_read = 0 cho thấy skill không được tác tử sử dụng, nên đây không phải bằng chứng chống lại self-evolving mà là bằng chứng về vấn đề kích hoạt skill. Không điều kiện nào cải thiện điểm tác vụ đánh giá (đều 0.00). Đề xuất: chạy lại mỗi cấu hình 3 lần, cải thiện description của skill (viết tiếng Anh, mở rộng tình huống kích hoạt) và kiểm tra vì sao skills_read = 0
 
 ## Phụ lục
 
 - Lệnh đã chạy (theo thứ tự):
+  pytest tests/test_02_agent.py
+  pytest tests/test_03_runner.py
+  pytest tests/test_04_curator.py
+  python -m lab.runner --condition baseline --tasks learn
+  python -m lab.runner --condition baseline --tasks eval
+  python -m lab.runner --condition subagents --tasks learn
+  python -m lab.runner --condition subagents --tasks eval
+  python -m lab.runner --condition skills-auto --tasks all
+  python -m lab.curator
+  python scripts/check_breakdown.py
 - Thử thách mở rộng (nếu có): hướng chọn, kết quả, nhận xét.
 - Ghi chú khác:

@@ -1,69 +1,74 @@
 {
-  "task": "logs-learn",
+  "task": "logs-eval",
   "condition": "skills-auto",
-  "role": "learn",
+  "role": "eval",
   "error": "GraphRecursionError: Recursion limit of 60 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
-  "timestamp": "2026-10-06T15:57:04.190553+00:00",
+  "timestamp": "2026-10-06T15:56:35.325482+00:00",
   "skills_sha256": "cb59cef5ed0f1411327dfcb962ea7245a1266ef24e04c6b29bbfda20a47d9755",
-  "seconds": 32.6,
+  "seconds": 27.9,
   "tokens": {
-    "input": 271889,
-    "output": 3136,
-    "total": 275025
+    "input": 242503,
+    "output": 1132,
+    "total": 243635
   },
   "tool_calls": 0,
   "subagent_calls": 0,
   "skills_read": 0,
   "skills_modified": false,
   "final_message": "",
-  "score": 0.6666666666666666,
-  "passed": 6,
-  "total": 9,
+  "score": 0.0,
+  "passed": 0,
+  "total": 10,
   "checks": [
     {
       "name": "valid_structure",
-      "passed": true,
+      "passed": false,
       "detail": ""
     },
     {
       "name": "entry_count",
-      "passed": true,
+      "passed": false,
       "detail": ""
     },
     {
       "name": "timestamps_utc",
-      "passed": true,
+      "passed": false,
       "detail": ""
     },
     {
-      "name": "exception_fields",
-      "passed": true,
+      "name": "levels_uppercase",
+      "passed": false,
       "detail": ""
     },
     {
       "name": "repeat_counts",
-      "passed": true,
+      "passed": false,
       "detail": ""
     },
     {
       "name": "counts_by_service",
-      "passed": true,
+      "passed": false,
       "detail": ""
     },
     {
       "name": "rule_service_names",
       "passed": false,
-      "detail": "RULE: service names in the output are lower-case with '-' replaced by '_' (payment-service -> payment_service)."
+      "detail": ""
     },
     {
       "name": "rule_sorted_errors",
       "passed": false,
-      "detail": "RULE: `errors` is sorted by service, then by timestamp_utc, ascending."
+      "detail": ""
     },
     {
       "name": "rule_schema_header",
       "passed": false,
-      "detail": "RULE: the top-level object has \"schema_version\": 2 and \"generated_by\": \"log-triage\"."
+      "detail": ""
+    },
+    {
+      "name": "rule_source_line",
+      "passed": false,
+      "detail": ""
     }
   ]
 }
