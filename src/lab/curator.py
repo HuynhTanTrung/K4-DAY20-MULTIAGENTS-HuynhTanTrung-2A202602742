@@ -4,6 +4,7 @@ Pseudo-code: guides/pseudocode/04_curator.md
 Kiểm tra:    pytest tests/test_04_curator.py
 Chạy thật:   python -m lab.curator
 """
+import json
 import re
 from pathlib import Path
 
@@ -56,21 +57,94 @@ def parse_skill_blocks(reply: str) -> list[tuple[str, str]]:
 
 
 def curate_skills(results_dir="results", source_condition="baseline", out_dir=None, model=None, max_skills: int = 3) -> list[Path]:
-    """Đọc các lần chạy của TÁC VỤ HỌC (role == "learn") trong `source_condition`, nhờ LLM viết skill, ghi file.
+    """Đọc các lần chạy của TÁC VỤ HỌC (role == "learn") trong `source_condition`, nhờ LLM viết skill, ghi file."""
+    from .model import make_model
+    from .tasks import ROOT
 
-    Các bước: nạp run.json + trace.md -> (nếu không có check nào thất bại: in cảnh báo và trả về [] mà KHÔNG gọi LLM)
-    -> dựng prompt -> model.invoke(prompt) -> parse_skill_blocks -> validate_skill(text, expected_name=name)
-    -> ghi `<out_dir>/<name>/SKILL.md`. Mặc định `out_dir` = <gốc lab>/skills/auto (dùng `ROOT` từ lab.tasks).
-    Giữ tối đa `max_skills` skill hợp lệ; skill không hợp lệ bị bỏ qua.
-    Prompt chứa, với mỗi check thất bại, TÊN và trường `detail` (lời nhận xét của bot đánh giá: phát biểu quy tắc bị vi phạm)
-    cùng phần cuối của vết (trace). Với tác vụ học, `detail` chỉ phát biểu quy tắc, không chứa đáp án.
-    Tuyệt đối KHÔNG đưa dữ liệu của tác vụ đánh giá (role == "eval") vào prompt.
-    model mặc định: make_model() (lab.model).
-    Trả về: danh sách đường dẫn SKILL.md đã ghi.
-    """
-    raise NotImplementedError("TODO: cài đặt curate_skills (xem guides/pseudocode/04_curator.md)")
+    if out_dir is None:
+        out_dir = ROOT / "skills" / "auto"
+    out_dir = Path(out_dir)
 
+    # 1. Thu thập các lần chạy tác vụ học
+    runs = []
+    for run_json in sorted(Path(results_dir, source_condition).glob("*/run.json")):
+        try:
+            r = json.loads(run_json.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if r.get("role") != "learn":
+            continue
+        trace_path = run_json.parent / "trace.md"
+        trace = ""
+        if trace_path.exists():
+            trace = trace_path.read_text(encoding="utf-8", errors="replace")[-6000:]
+        failed = [(c["name"], c.get("detail", "")) for c in r.get("checks", []) if not c.get("passed")]
+        runs.append({"task": r.get("task"), "failed": failed, "trace": trace})
 
-if __name__ == "__main__":
-    for p in curate_skills():
-        print("wrote", p)
+    if not any(run["failed"] for run in runs):
+        print("[curator] không có check thất bại ở tác vụ học; bỏ qua.")
+        return []
+
+    # 2. Dựng prompt
+    blocks = []
+    for run in runs:
+        if not run["failed"]:
+            continue
+        lines = [f"TASK: {run['task']}", "FAILED CHECKS:"]
+        for name, detail in run["failed"]:
+            lines.append(f"- {name}: {detail}")
+        if run["trace"]:
+            lines.append("TRACE (tail):")
+            lines.append(run["trace"])
+        blocks.append("\n".join(lines))
+
+    prompt = (
+        "Bạn viết SKILL cho một tác tử lập trình và phân tích dữ liệu.\n"
+        "Dưới đây là các check thất bại (tên và nhận xét của bot đánh giá) và vết của các lần chạy.\n"
+        "Hãy tìm các lỗi QUY TRÌNH chung (không phải đáp án cụ thể) và viết tối đa "
+        f"{max_skills} skill ngắn giúp tránh các lỗi đó trên tác vụ MỚI cùng loại.\n\n"
+        "Quy tắc:\n"
+        "- Skill phải tổng quát: không nêu id tác vụ, không nêu tên tệp riêng của một tác vụ, không nêu đáp án hay con số.\n"
+        "- Mỗi skill có frontmatter YAML gồm `name` (chữ thường, gạch ngang) và `description` (một câu: DÙNG KHI NÀO),\n"
+        "  sau đó tối đa 40 dòng chỉ dẫn mệnh lệnh (danh sách kiểm tra - checklist - hoạt động tốt).\n"
+        "- Định dạng đầu ra, đúng từng ký tự:\n"
+        "=== SKILL: <name> ===\n"
+        "---\n"
+        "name: <name>\n"
+        "description: <khi nào dùng>\n"
+        "---\n"
+        "<nội dung>\n"
+        "=== END ===\n\n"
+        + "\n\n".join(blocks)
+    )
+
+    # 3. Gọi mô hình
+    if model is None:
+        model = make_model()
+    raw = model.invoke(prompt).content
+    if isinstance(raw, str):
+        reply = raw
+    elif isinstance(raw, list):
+        # content blocks: ghép tất cả block có 'text'
+        reply = "\n".join(
+            block.get("text", "") for block in raw
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+    else:
+        reply = str(raw)
+
+    # 4. Parse, validate, ghi file
+    written = []
+    for name, text in parse_skill_blocks(reply):
+        if len(written) >= max_skills:
+            break
+        problems = validate_skill(text, expected_name=name)
+        if problems:
+            print(f"[curator] bỏ qua skill {name!r}: {problems}")
+            continue
+        skill_dir = out_dir / name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(text, encoding="utf-8")
+        written.append(skill_dir / "SKILL.md")
+
+    return written
